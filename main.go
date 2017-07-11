@@ -5,11 +5,13 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
 	"strconv"
 
+	"github.com/dustin/go-humanize"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
 )
@@ -20,9 +22,19 @@ var asyncDepth = 2
 
 type Output struct {
 	Path  string
-	Size  int64
-	Count int64
+	Size  uint64
+	Count uint64
 }
+
+func (o Output) str() string {
+	return o.Path + "," + fmt.Sprint(humanize.Bytes(o.Size)) + "," + fmt.Sprint(o.Count)
+}
+
+type BySize []Output
+
+func (a BySize) Len() int           { return len(a) }
+func (a BySize) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a BySize) Less(i, j int) bool { return a[i].Size > a[j].Size } // descendent
 
 var cpuCount int
 
@@ -59,12 +71,18 @@ func checkNonRepeat(root string) {
 
 	result := make(chan Output, cpuCount)
 	c := make(chan Output)
+	forSort := []Output{}
 	go getSizeRecursiveNonRepeat(root, 0, c, result)
 	for i := 0; i < len(paths); i++ {
 		o := <-result
+		forSort = append(forSort, o)
 		buf += o.Path + "," + fmt.Sprint(o.Size) + "," + fmt.Sprint(o.Count) + "\n"
 	}
 
+	sort.Sort(BySize(forSort))
+	for i := 0; i < 20; i++ {
+		fmt.Println(forSort[i].str())
+	}
 	ioutil.WriteFile("./ouput_utf8.csv", []byte(buf), os.ModePerm)
 
 	b, err := ioutil.ReadAll(transform.NewReader(strings.NewReader(buf), japanese.ShiftJIS.NewEncoder()))
@@ -82,7 +100,6 @@ func getTargetPaths(root string, depth int) []string {
 	if err != nil {
 		fmt.Println("error occured: ", err.Error())
 		return make([]string, 0) // if permission denied, return empty
-		// panic(err)
 	}
 
 	paths := make([]string, 0)
@@ -104,15 +121,13 @@ func getTargetPaths(root string, depth int) []string {
 	return paths
 }
 
-func getSizeRecursive(root, search string) (int64, int64) {
+func getSizeRecursive(root, search string) (uint64, uint64) {
 	fi, err := ioutil.ReadDir(search)
 	if err != nil {
-		// fmt.Println("error occured: ", err.Error())
 		return 0, 0 // if permission denied, return zeros
-		// panic(err)
 	}
 
-	var size, count int64
+	var size, count uint64
 	for _, f := range fi {
 		if f.IsDir() {
 			n := f.Name()
@@ -120,7 +135,7 @@ func getSizeRecursive(root, search string) (int64, int64) {
 			size += s
 			count += c
 		} else {
-			size += f.Size()
+			size += uint64(f.Size())
 			count++
 		}
 	}
@@ -139,7 +154,7 @@ func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output,
 		// panic(err)
 	}
 
-	var size, count int64
+	var size, count uint64
 	length := 0
 	for _, f := range fi {
 		if f.IsDir() {
@@ -158,7 +173,7 @@ func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output,
 				count += c
 			}
 		} else {
-			size += f.Size()
+			size += uint64(f.Size())
 			count++
 		}
 	}
@@ -172,6 +187,6 @@ func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output,
 	outputChan <- Output{Path: search, Size: size, Count: count}
 	if depth <= maxDepth+1 {
 		resultChan <- Output{Path: search, Size: size, Count: count}
-		fmt.Println(search, ",", size, ",", count)
+		// fmt.Println(search, ",", size, ",", count)
 	}
 }
