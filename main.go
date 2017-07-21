@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/dustin/go-humanize"
+	"github.com/urfave/cli"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
 )
@@ -39,11 +40,20 @@ func (a BySize) Less(i, j int) bool { return a[i].Size > a[j].Size } // descende
 var cpuCount int
 
 func main() {
+	app := cli.NewApp()
+	app.Name = "dirgo"
+	app.Usage = "dirgo root_path [asyncdepth=2]"
+	app.Version = "0.0.1"
+	app.Action = core
+	app.Run(os.Args)
+}
+
+func core(c *cli.Context) error {
 	cpuCount = runtime.NumCPU()
 	runtime.GOMAXPROCS(cpuCount)
 
 	fmt.Println("start! Core:", cpuCount)
-	root := os.Args[1]
+	root := c.Args().Get(0)
 	_, err := os.Stat(root)
 	if err != nil {
 		fmt.Println("You must set the valid target path.")
@@ -51,8 +61,8 @@ func main() {
 	}
 
 	// asyncDepth is optional
-	if len(os.Args) >= 3 {
-		ad := os.Args[2]
+	if c.NArg() >= 2 {
+		ad := c.Args().Get(1)
 		argDepth, err := strconv.Atoi(ad)
 		if err == nil {
 			asyncDepth = argDepth
@@ -61,6 +71,7 @@ func main() {
 	fmt.Println("async depth: ", asyncDepth)
 
 	checkNonRepeat(root)
+	return nil
 }
 
 func checkNonRepeat(root string) {
