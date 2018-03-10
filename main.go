@@ -45,6 +45,12 @@ func main() {
 	app.Usage = "dirgo root_path [asyncdepth=2]"
 	app.Version = "0.0.1"
 	app.Action = core
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "asyncDepth, a",
+			Usage: "set async depth",
+		},
+	}
 	app.Run(os.Args)
 }
 
@@ -57,7 +63,7 @@ func core(c *cli.Context) error {
 	_, err := os.Stat(root)
 	if err != nil {
 		fmt.Println("You must set the valid target path.")
-		panic(err)
+		return nil
 	}
 
 	// asyncDepth is optional
@@ -156,13 +162,11 @@ func getSizeRecursive(root, search string) (uint64, uint64) {
 func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output, resultChan chan Output) {
 	fi, err := ioutil.ReadDir(search)
 	if err != nil {
-		// fmt.Println("error occured: ", err.Error())
 		outputChan <- Output{Path: search, Size: 0, Count: 0}
 		if depth <= maxDepth+1 {
 			resultChan <- Output{Path: search, Size: 0, Count: 0}
 		}
 		return
-		// panic(err)
 	}
 
 	var size, count uint64
