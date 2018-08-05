@@ -111,7 +111,9 @@ func checkNonRepeat(root string) {
 	for i := 0; i < len(paths); i++ {
 		o := <-result
 		forSort = append(forSort, o)
-		buf += o.Path + "," + fmt.Sprint(o.Size) + "," + fmt.Sprint(o.Count) + "\n"
+		if outputPath != "" {
+			buf += o.Path + "," + fmt.Sprint(o.Size) + "," + fmt.Sprint(o.Count) + "\n"
+		}
 	}
 
 	sort.Sort(BySize(forSort))
