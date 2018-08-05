@@ -1,18 +1,15 @@
-# directory-go
-directory-go searches 2-depth directories and check size and file count.
+# dirgo
+dirgo searches 2-depth directories and checks size and file count, then outputs pathes that are sorted size decendant.
+
 
 ## How to use
-### win
+### Install
+`go get github.com/taross-f/dirgo`
+`export PATH=$PATH:$GOPATH/bin`
 
-`./main.exe \target\path [asyncdepth]`
+### help
 
-### mac
+`dirgo -h`
 
-`./main /target/path [asyncdepth]`
-
-
-## Outputs
-`./output.csv`
-`./output_utf8.csv`
 
 

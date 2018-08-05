@@ -9,17 +9,16 @@ import (
 	"strings"
 	"time"
 
-	"strconv"
-
 	"github.com/dustin/go-humanize"
 	"github.com/urfave/cli"
-	"golang.org/x/text/encoding/japanese"
-	"golang.org/x/text/transform"
 )
 
 const maxDepth int = 1
 
-var asyncDepth = 2
+var asyncDepth int
+var outputPath string
+var vervose bool
+var count int
 
 type Output struct {
 	Path  string
@@ -27,7 +26,7 @@ type Output struct {
 	Count uint64
 }
 
-func (o Output) str() string {
+func (o *Output) str() string {
 	return o.Path + "," + fmt.Sprint(humanize.Bytes(o.Size)) + "," + fmt.Sprint(o.Count)
 }
 
@@ -42,33 +41,58 @@ var cpuCount int
 func main() {
 	app := cli.NewApp()
 	app.Name = "dirgo"
-	app.Usage = "dirgo root_path [asyncdepth=2]"
+	app.HelpName = "dirgo"
+	app.UsageText = "dirgo [-o output_path] [-d asyncDepth]  target_path"
 	app.Version = "0.0.1"
 	app.Action = core
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:        "outfile, o",
+			Usage:       "file path to output",
+			Destination: &outputPath,
+		},
+		cli.IntFlag{
+			Name:        "asyncdepth, d",
+			Usage:       "depth searching asynchronously",
+			Value:       3,
+			Destination: &asyncDepth,
+		},
+		cli.BoolFlag{
+			Name:        "vervose, V",
+			Usage:       "log vervosely",
+			Destination: &vervose,
+		},
+		cli.IntFlag{
+			Name:        "count, c",
+			Usage:       "output path count",
+			Value:       20,
+			Destination: &count,
+		},
+	}
 	app.Run(os.Args)
+}
+
+func log(s string) {
+	if !vervose {
+		return
+	}
+	println(s)
 }
 
 func core(c *cli.Context) error {
 	cpuCount = runtime.NumCPU()
 	runtime.GOMAXPROCS(cpuCount)
 
-	fmt.Println("start! Core:", cpuCount)
+	log("start! Core:" + string(cpuCount))
 	root := c.Args().Get(0)
 	_, err := os.Stat(root)
 	if err != nil {
 		fmt.Println("You must set the valid target path.")
-		panic(err)
+		return err
 	}
-
-	// asyncDepth is optional
-	if c.NArg() >= 2 {
-		ad := c.Args().Get(1)
-		argDepth, err := strconv.Atoi(ad)
-		if err == nil {
-			asyncDepth = argDepth
-		}
-	}
-	fmt.Println("async depth: ", asyncDepth)
+	root = strings.TrimRight(root, "/\\")
+	log("output: " + outputPath)
+	log("async depth: " + string(asyncDepth))
 
 	checkNonRepeat(root)
 	return nil
@@ -77,7 +101,7 @@ func core(c *cli.Context) error {
 func checkNonRepeat(root string) {
 	syncStart := time.Now()
 	paths := getTargetPaths(root, 0)
-	fmt.Println("path count:" + fmt.Sprint(len(paths)))
+	log("path count:" + fmt.Sprint(len(paths)))
 	buf := ""
 
 	result := make(chan Output, cpuCount)
@@ -91,19 +115,17 @@ func checkNonRepeat(root string) {
 	}
 
 	sort.Sort(BySize(forSort))
-	for i := 0; i < 20; i++ {
+	for i := 0; i < count; i++ {
 		fmt.Println(forSort[i].str())
 	}
-	ioutil.WriteFile("./ouput_utf8.csv", []byte(buf), os.ModePerm)
 
-	b, err := ioutil.ReadAll(transform.NewReader(strings.NewReader(buf), japanese.ShiftJIS.NewEncoder()))
-	if err != nil {
-		fmt.Println(err.Error())
+	if outputPath != "" {
+		ioutil.WriteFile(outputPath, []byte(buf), os.ModePerm)
 	}
-	ioutil.WriteFile("./output.csv", b, os.ModePerm)
+
 	syncEnd := time.Now()
 
-	fmt.Println("---output: ", syncEnd.Sub(syncStart).Seconds(), "sec")
+	log(fmt.Sprintf("---output: %f sec", syncEnd.Sub(syncStart).Seconds()))
 }
 
 func getTargetPaths(root string, depth int) []string {
@@ -156,13 +178,11 @@ func getSizeRecursive(root, search string) (uint64, uint64) {
 func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output, resultChan chan Output) {
 	fi, err := ioutil.ReadDir(search)
 	if err != nil {
-		// fmt.Println("error occured: ", err.Error())
 		outputChan <- Output{Path: search, Size: 0, Count: 0}
 		if depth <= maxDepth+1 {
 			resultChan <- Output{Path: search, Size: 0, Count: 0}
 		}
 		return
-		// panic(err)
 	}
 
 	var size, count uint64
@@ -198,6 +218,5 @@ func getSizeRecursiveNonRepeat(search string, depth int, outputChan chan Output,
 	outputChan <- Output{Path: search, Size: size, Count: count}
 	if depth <= maxDepth+1 {
 		resultChan <- Output{Path: search, Size: size, Count: count}
-		// fmt.Println(search, ",", size, ",", count)
 	}
 }
