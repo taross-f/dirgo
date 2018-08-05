@@ -47,6 +47,7 @@ func main() {
 	app.Action = core
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
+<<<<<<< HEAD
 			Name:        "outfile, o",
 			Usage:       "file path to output",
 			Destination: &outputPath,
@@ -67,6 +68,10 @@ func main() {
 			Usage:       "output path count",
 			Value:       20,
 			Destination: &count,
+=======
+			Name:  "asyncDepth, a",
+			Usage: "set async depth",
+>>>>>>> ee0067763be72f4ab1f350e9429fadc5238a9c57
 		},
 	}
 	app.Run(os.Args)
@@ -88,7 +93,11 @@ func core(c *cli.Context) error {
 	_, err := os.Stat(root)
 	if err != nil {
 		fmt.Println("You must set the valid target path.")
+<<<<<<< HEAD
 		return err
+=======
+		return nil
+>>>>>>> ee0067763be72f4ab1f350e9429fadc5238a9c57
 	}
 	root = strings.TrimRight(root, "/\\")
 	log("output: " + outputPath)
