@@ -1,7 +1,8 @@
 linters:
+  disable-all: true
   enable:
     - gofmt
-    - golint
+    - revive
     - govet
     - errcheck
     - staticcheck
@@ -11,9 +12,19 @@ linters:
     - misspell
     - gocritic
 
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+
 run:
   deadline: 5m
   tests: true
+
+output:
+  format: colored-line-number
 
 issues:
   exclude-rules:
