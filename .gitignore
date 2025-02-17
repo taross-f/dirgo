@@ -28,7 +28,7 @@ _testmain.go
 *.dll
 *.so
 *.dylib
-dirgo
+/dirgo
 
 # Test binary, built with `go test -c`
 *.test
