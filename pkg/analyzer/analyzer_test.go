@@ -92,4 +92,4 @@ func TestAnalyzer_Analyze(t *testing.T) {
 			}
 		})
 	}
-} 
+}

@@ -68,4 +68,4 @@ func (f *Formatter) WriteCSV(results []analyzer.Result, outputPath string) error
 	}
 
 	return nil
-} 
+}

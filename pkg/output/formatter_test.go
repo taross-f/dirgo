@@ -107,4 +107,4 @@ func TestFormatter_WriteCSV(t *testing.T) {
 	if !strings.HasPrefix(lines[0], "Path,Size,FileCount") {
 		t.Error("WriteCSV() header is incorrect")
 	}
-} 
+}

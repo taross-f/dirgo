@@ -39,17 +39,17 @@ func NewAnalyzer(maxDepth, asyncDepth, workers int) *Analyzer {
 // Analyze は指定されたルートディレクトリの解析を行います
 func (a *Analyzer) Analyze(root string) ([]Result, error) {
 	root = filepath.Clean(root)
-	
+
 	if _, err := os.Stat(root); err != nil {
 		return nil, fmt.Errorf("invalid path %s: %w", root, err)
 	}
 
 	paths := a.getTargetPaths(root, 0)
 	results := make([]Result, 0, len(paths))
-	
+
 	var wg sync.WaitGroup
 	resultChan := make(chan Result, a.workers)
-	
+
 	// 結果を収集するゴルーチン
 	go func() {
 		for result := range resultChan {
@@ -129,4 +129,4 @@ func (a *Analyzer) analyzeDir(path string) (uint64, uint64) {
 	}
 
 	return size, count
-} 
+}
