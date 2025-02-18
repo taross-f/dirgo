@@ -15,6 +15,7 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		"dir1",
 		"dir1/subdir1",
 		"dir2",
+		"empty_dir",
 	}
 
 	files := map[string]int64{
@@ -51,14 +52,33 @@ func TestAnalyzer_Analyze(t *testing.T) {
 		{
 			name:     "depth 1",
 			maxDepth: 1,
-			wantDirs: 2,
+			wantDirs: 4, // dir1, dir2, empty_dir
 			wantFiles: map[string]uint64{
-				"dir1": 2,
-				"dir2": 1,
+				"dir1":      1, // file1.txt
+				"dir2":      1, // file3.txt
+				"empty_dir": 0,
 			},
 			wantSize: map[string]uint64{
-				"dir1": 300, // 100 + 200
-				"dir2": 300,
+				"dir1":      100, // file1.txt
+				"dir2":      300, // file3.txt
+				"empty_dir": 0,
+			},
+		},
+		{
+			name:     "depth 2",
+			maxDepth: 2,
+			wantDirs: 4, // dir1, dir1/subdir1, dir2, empty_dir
+			wantFiles: map[string]uint64{
+				"dir1":      1, // file1.txt
+				"subdir1":   1, // file2.txt
+				"dir2":      1, // file3.txt
+				"empty_dir": 0,
+			},
+			wantSize: map[string]uint64{
+				"dir1":      100, // file1.txt
+				"subdir1":   200, // file2.txt
+				"dir2":      300, // file3.txt
+				"empty_dir": 0,
 			},
 		},
 	}
@@ -89,6 +109,70 @@ func TestAnalyzer_Analyze(t *testing.T) {
 						t.Errorf("Analyze() for %s got size %d, want %d", basePath, result.Size, wantSize)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestAnalyzer_AnalyzeErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "non-existent directory",
+			path:    "/path/that/does/not/exist",
+			wantErr: true,
+		},
+		{
+			name:    "empty path",
+			path:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := NewAnalyzer(1, 1, 1)
+			_, err := a.Analyze(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Analyze() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestResult_String(t *testing.T) {
+	tests := []struct {
+		name   string
+		result Result
+		want   string
+	}{
+		{
+			name: "normal result",
+			result: Result{
+				Path:  "/test/path",
+				Size:  1024,
+				Count: 5,
+			},
+			want: "/test/path: 1024 bytes, 5 files",
+		},
+		{
+			name: "empty result",
+			result: Result{
+				Path:  "/empty",
+				Size:  0,
+				Count: 0,
+			},
+			want: "/empty: 0 bytes, 0 files",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.result.String(); got != tt.want {
+				t.Errorf("Result.String() = %v, want %v", got, tt.want)
 			}
 		})
 	}

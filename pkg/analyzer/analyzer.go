@@ -38,8 +38,11 @@ func NewAnalyzer(maxDepth, asyncDepth, workers int) *Analyzer {
 
 // Analyze は指定されたルートディレクトリの解析を行います
 func (a *Analyzer) Analyze(root string) ([]Result, error) {
-	root = filepath.Clean(root)
+	if root == "" {
+		return nil, fmt.Errorf("empty path provided")
+	}
 
+	root = filepath.Clean(root)
 	if _, err := os.Stat(root); err != nil {
 		return nil, fmt.Errorf("invalid path %s: %w", root, err)
 	}
@@ -49,12 +52,14 @@ func (a *Analyzer) Analyze(root string) ([]Result, error) {
 
 	var wg sync.WaitGroup
 	resultChan := make(chan Result, a.workers)
+	doneChan := make(chan struct{})
 
 	// 結果を収集するゴルーチン
 	go func() {
 		for result := range resultChan {
 			results = append(results, result)
 		}
+		close(doneChan)
 	}()
 
 	// 各パスを非同期で解析
@@ -73,6 +78,7 @@ func (a *Analyzer) Analyze(root string) ([]Result, error) {
 
 	wg.Wait()
 	close(resultChan)
+	<-doneChan // 結果の収集が完了するまで待機
 
 	return results, nil
 }
@@ -94,13 +100,23 @@ func (a *Analyzer) getTargetPaths(root string, depth int) []string {
 		return paths
 	}
 
+	// 現在のディレクトリのサブディレクトリを追加
 	for _, entry := range entries {
 		if entry.IsDir() {
-			subPaths := a.getTargetPaths(filepath.Join(root, entry.Name()), depth+1)
-			paths = append(paths, subPaths...)
-			paths = append(paths, filepath.Join(root, entry.Name()))
+			subPath := filepath.Join(root, entry.Name())
+			paths = append(paths, subPath)
 		}
 	}
+
+	// サブディレクトリの下のパスを追加
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subPath := filepath.Join(root, entry.Name())
+			subPaths := a.getTargetPaths(subPath, depth+1)
+			paths = append(paths, subPaths...)
+		}
+	}
+
 	return paths
 }
 
@@ -110,6 +126,11 @@ func (a *Analyzer) analyzeDir(path string) (uint64, uint64) {
 
 	err := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
+			return filepath.SkipDir
+		}
+
+		// ルートディレクトリ以外のディレクトリはスキップ
+		if d.IsDir() && p != path {
 			return filepath.SkipDir
 		}
 

@@ -42,6 +42,24 @@ func TestFormatter_WriteResults(t *testing.T) {
 			limit:    1,
 			wantRows: 1,
 		},
+		{
+			name:     "empty results",
+			results:  []analyzer.Result{},
+			limit:    1,
+			wantRows: 0,
+		},
+		{
+			name:     "zero limit",
+			results:  results,
+			limit:    0,
+			wantRows: 0,
+		},
+		{
+			name:     "negative limit",
+			results:  results,
+			limit:    -1,
+			wantRows: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -56,6 +74,9 @@ func TestFormatter_WriteResults(t *testing.T) {
 
 			output := buf.String()
 			lines := strings.Split(strings.TrimSpace(output), "\n")
+			if output == "" {
+				lines = []string{}
+			}
 			if len(lines) != tt.wantRows {
 				t.Errorf("WriteResults() got %d rows, want %d", len(lines), tt.wantRows)
 			}
@@ -77,34 +98,73 @@ func TestFormatter_WriteCSV(t *testing.T) {
 		},
 	}
 
-	// テスト用の一時ディレクトリを作成
-	tempDir := t.TempDir()
-	csvPath := filepath.Join(tempDir, "test.csv")
-
-	f := NewFormatter(os.Stdout)
-	err := f.WriteCSV(results, csvPath)
-	if err != nil {
-		t.Fatalf("WriteCSV() error = %v", err)
+	tests := []struct {
+		name      string
+		results   []analyzer.Result
+		path      string
+		wantError bool
+	}{
+		{
+			name:      "normal output",
+			results:   results,
+			path:      "test.csv",
+			wantError: false,
+		},
+		{
+			name:      "empty results",
+			results:   []analyzer.Result{},
+			path:      "empty.csv",
+			wantError: false,
+		},
+		{
+			name:      "invalid path",
+			results:   results,
+			path:      "/invalid/path/that/does/not/exist/test.csv",
+			wantError: true,
+		},
 	}
 
-	// ファイルが作成されたことを確認
-	if _, err := os.Stat(csvPath); os.IsNotExist(err) {
-		t.Error("WriteCSV() did not create the file")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			csvPath := filepath.Join(tempDir, tt.path)
 
-	// ファイルの内容を読み込んで検証
-	content, err := os.ReadFile(csvPath)
-	if err != nil {
-		t.Fatalf("failed to read CSV file: %v", err)
-	}
+			// 無効なパスの場合は、そのまま使用
+			if tt.wantError {
+				csvPath = tt.path
+			}
 
-	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
-	if len(lines) != 3 { // ヘッダー + 2行のデータ
-		t.Errorf("WriteCSV() got %d rows, want 3", len(lines))
-	}
+			f := NewFormatter(os.Stdout)
+			err := f.WriteCSV(tt.results, csvPath)
 
-	// ヘッダーの検証
-	if !strings.HasPrefix(lines[0], "Path,Size,FileCount") {
-		t.Error("WriteCSV() header is incorrect")
+			if (err != nil) != tt.wantError {
+				t.Errorf("WriteCSV() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+
+			if !tt.wantError {
+				// ファイルが作成されたことを確認
+				if _, err := os.Stat(csvPath); os.IsNotExist(err) {
+					t.Error("WriteCSV() did not create the file")
+				}
+
+				// ファイルの内容を読み込んで検証
+				content, err := os.ReadFile(csvPath)
+				if err != nil {
+					t.Fatalf("failed to read CSV file: %v", err)
+				}
+
+				lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+				expectedLines := len(tt.results) + 1 // ヘッダー + データ行
+				if len(lines) != expectedLines {
+					t.Errorf("WriteCSV() got %d rows, want %d", len(lines), expectedLines)
+				}
+
+				// ヘッダーの検証
+				if !strings.HasPrefix(lines[0], "Path,Size,FileCount") {
+					t.Error("WriteCSV() header is incorrect")
+				}
+			}
+		})
 	}
 }
